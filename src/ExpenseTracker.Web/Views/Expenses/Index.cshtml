@@ -1,0 +1,98 @@
+﻿@model IEnumerable<ExpenseTracker.Domain.Expense>
+@{
+    ViewData["Title"] = "Expenses";
+    var total = (decimal)(ViewBag.Total ?? 0m);
+    var categories = (IEnumerable<string>) (ViewBag.Categories ?? Array.Empty<string>());
+    var filters = ViewBag.Filters ?? new { From = (DateTime?)null, To = (DateTime?)null, Category = (string?)null };
+
+    DateTime? from = (DateTime?)filters.GetType().GetProperty("From")?.GetValue(filters, null);
+    DateTime? to = (DateTime?)filters.GetType().GetProperty("To")?.GetValue(filters, null);
+    string category = (string)(filters.GetType().GetProperty("Category")?.GetValue(filters, null) ?? "All");
+    string dateToInput(DateTime? d) => d.HasValue ? d.Value.ToString("yyyy-MM-dd") : "";
+}
+<h2>My Expenses</h2>
+
+<form method="get" class="row g-3 mb-3">
+  <div class="col-md-3">
+    <label class="form-label">From</label>
+    <input name="From" type="date" class="form-control" value="@dateToInput(from)" />
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">To</label>
+    <input name="To" type="date" class="form-control" value="@dateToInput(to)" />
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Category</label>
+        <select name="Category" class="form-select">
+            <option value="All" selected="@(category == "All" ? "selected" : null)">All</option>
+            @foreach (var c in categories)
+            {
+                <option value="@c" selected="@(category == c ? "selected" : null)">@c</option>
+            }
+        </select>
+  </div>
+  <div class="col-md-3 d-flex align-items-end">
+    <button class="btn btn-primary me-2" type="submit">Apply</button>
+    <a class="btn btn-outline-secondary" href="@Url.Action("Index", "Expenses")">Reset</a>
+  </div>
+</form>
+
+<p><strong>Total (filtered):</strong> @total.ToString("C")</p>
+
+<div class="row mb-4">
+  <div class="col-md-6"><div class="card"><div class="card-body">
+    <h5 class="card-title">Spend by Category</h5>
+    <canvas id="catChart"></canvas>
+  </div></div></div>
+  <div class="col-md-6"><div class="card"><div class="card-body">
+    <h5 class="card-title">Spend by Month</h5>
+    <canvas id="monthChart"></canvas>
+  </div></div></div>
+</div>
+
+<table class="table table-striped">
+  <thead><tr><th>Date</th><th>Category</th><th>Description</th><th class="text-end">Amount</th><th>Receipt</th><th></th></tr></thead>
+  <tbody>
+  @foreach (var e in Model) {
+    <tr>
+      <td>@e.Date.ToShortDateString()</td>
+      <td>@e.Category</td>
+      <td>@e.Description</td>
+      <td class="text-end">@e.Amount.ToString("C")</td>
+      <td>@(string.IsNullOrWhiteSpace(e.ReceiptBlobUrl) ? "" : $"<a target=\"_blank\" href=\"{e.ReceiptBlobUrl}\">View</a>")</td>
+      <td>
+        <form asp-action="Delete" method="post">
+          <input type="hidden" name="id" value="@e.Id" />
+          <button class="btn btn-sm btn-outline-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+  }
+  </tbody>
+</table>
+
+@section Scripts {
+<script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const qs = params.toString();
+  const url = '/expenses/chart-data' + (qs ? ('?' + qs) : '');
+  fetch(url, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      new Chart(document.getElementById('catChart'), {
+        type: 'doughnut',
+        data: { labels: data.byCategory.map(x=>x.label),
+                datasets: [{ data: data.byCategory.map(x=>x.amount) }] },
+        options: { plugins: { legend: { position: 'bottom' } } }
+      });
+      new Chart(document.getElementById('monthChart'), {
+        type: 'bar',
+        data: { labels: data.byMonth.map(x=>x.label),
+                datasets: [{ data: data.byMonth.map(x=>x.amount) }] },
+        options: { scales: { y: { beginAtZero: true } } }
+      });
+    });
+})();
+</script>
+}
