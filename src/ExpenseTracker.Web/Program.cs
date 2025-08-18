@@ -18,6 +18,12 @@ builder.Services
 builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
 {
     options.ResponseType = OpenIdConnectResponseType.Code;
+
+    var clientSecret = builder.Configuration["AzureAd:ClientSecret"];
+    if (!string.IsNullOrWhiteSpace(clientSecret))
+    {
+        options.ClientSecret = clientSecret;
+    }
 });
 builder.Services.AddAuthorization();
 
